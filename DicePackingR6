@@ -31,9 +31,10 @@ NDvol = Dvol(ind1);
 NDreq = Dreq(ind1,:);
 N = length(NDid);
 Wcnt = Inf;
+NBladeSplit = BladeSplit(ind1);
 % NIso1mm = Iso1mm(ind1);
 % NCaround = Caround(ind1);
-% NSameCut = SameCut(ind1);
+NSameCut = SameCut(ind1);
 
 th_NDdimy=1.25;                                    %empty not enough ==> allow shorter y-size dice placement  
 th_nRow=1.2;                                          %as previously placed dice's ysize > th_nRow*new_ysize ==> trigger multi-row mode 
@@ -59,12 +60,20 @@ height_nRow=0;
 Dcor = zeros(N,4);
 DPool=true(N,1);
 newnRow=false;
+SplitFlag = false;
+ScutFlag = false;
 
- if max(BladeSplit)==2
-    Dpool2 = Dpool(BladeSplit==2);
-    Dpool = ~Dpool2;
+if max(NBladeSplit)==2
+    DPool2 = DPool & (NBladeSplit==2);
+    DPool = ~DPool2;
     SplitFlag=true;
 end;
+
+% if max(NSameCut)>0
+%     CutInfo = 
+%     
+% end;
+
 
 while any(DPool)   
 
@@ -93,8 +102,8 @@ while any(DPool)
 
      DPool(n) = false;
      [shelf,Dcor,Dloc(1)] = BulidShelf(shelf,Dcor,W,NDid,NDdimx,NDdimy,i,n,height_nRow,1); %Single Row
-     
-     shelf.Rid = [shelf.Rid;1];
+         
+     shelf(i).Rid = [shelf(i).Rid;1];
      if newnRow
          height_nRow(1)=NDdimy(n); 
      end;
@@ -116,11 +125,12 @@ while any(DPool)
            end;
           DPool(n_multi) = false;
           [shelf,Dcor,Dloc(nr)] = BulidShelf(shelf,Dcor,W,NDid,NDdimx,NDdimy,i,n_multi,height_nRow,nr);
-          shelf.Rid = [shelf.Rid; nr];
+          shelf(i).Rid = [shelf(i).Rid; nr];
       end
  end
       shelf(i).nRow=length(height_nRow);
       newnRow=false;
+            
 
       if isempty(n) && isempty(n_multi)
          [Dcor,shelf]=xEqualSpace(Dcor,shelf,W,i);
@@ -129,12 +139,14 @@ while any(DPool)
          height_nRow=0;
       end
       
-      if SplitFlag && ~any(Dpool)
-          Dpool=Dpool2;
+      if SplitFlag && ~any(DPool)
+          DPool=DPool2;
           SplitFlag=false;
-           i=i+1;
-           shelf(i).empty=W;
-           height_nRow=0;
+          if ~(isempty(n) && isempty(n_multi))
+              i=i+1;
+              shelf(i).empty=W;
+              height_nRow=0;
+          end;           
            T_height = T_height+1000;
       end;
       
@@ -423,7 +435,7 @@ for i = 1:length(shelf)
                 end;
                 
                 if ~isempty(Rinds)
-                    Dgap = Dcor(shelf(i).Dinfo(R,1),1)-Dcor(shelf(i).Dinfo(j,1),3);                    
+                    Dgap = Dcor(shelf(i).Dinfo(Rinds,1),1)-Dcor(shelf(i).Dinfo(j,1),3);                    
                     Dcor(shelf(i).Dinfo(Rinds,1),1) = Dcor(shelf(i).Dinfo(Rinds,1),1)-Dgap;
                     Dcor(shelf(i).Dinfo(Rinds,1),3) = Dcor(shelf(i).Dinfo(Rinds,1),3)-Dgap;                                              
                 end;            
