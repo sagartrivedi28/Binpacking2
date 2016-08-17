@@ -199,15 +199,19 @@ handles.Rymax = str2num(get(handles.edit_Rymax,'String'));
 if MPW_flag
     
     [~,~,Dice_data1] = xlsread(handles.xlspath,1,['B2:G' num2str(handles.Maxno+1)]);    
-    % B = ID, C=X-Size, D=Y-Size, E=X-Loc, F=Y-Loc
-    
-    Fcor = [Dice_data1(:,4)-Dice_data1(:,2)/2, Dice_data1(:,5)-Dice_data1(:,3)/2, Dice_data1(:,4)+Dice_data1(:,2)/2, Dice_data1(:,5)+Dice_data1(:,3)/2];
-    Dvol = Dice_data1{:,6};
+    % B = ID, C=X-Size, D=Y-Size, E=X-Loc, F=Y-Loc, G=DVol
+    Did = (1:size(Dice_data1,1))';
+    Fcor = [cell2mat(Dice_data1(:,4))-cell2mat(Dice_data1(:,2))/2, cell2mat(Dice_data1(:,5))-cell2mat(Dice_data1(:,3))/2,...
+        cell2mat(Dice_data1(:,4))+cell2mat(Dice_data1(:,2))/2, cell2mat(Dice_data1(:,5))+cell2mat(Dice_data1(:,3))/2];
+    Dvol = cell2mat(Dice_data1(:,6));
     Gpara.Rmax = [handles.Rxmax handles.Rymax]*10^3;
     Gpara.Sline = handles.slwidth;
     Gpara.Rno = (1:handles.Maxno)';
     [Fsets,Fwafer] = MPW_DicePacking(Fcor,cell2mat(Dice_data1(:,2)),cell2mat(Dice_data1(:,3)),Dvol,Gpara,handles.axes1);
     
+    Fvol = Dvol;
+    Fid = Did;
+    FDdim = [cell2mat(Dice_data1(:,2)), cell2mat(Dice_data1(:,3))];
     Rnew = [max(Fcor(:,3))-min(Fcor(:,1)) max(Fcor(:,4))-min(Fcor(:,2))]/10^3;
     Dstruct = DieOffset(Rnew(1),Rnew(2),handles.wsize);
     GDPW = sum(Dstruct.map_in(:));    
@@ -218,7 +222,7 @@ else
     Fwafer = Inf;
     GDPW = 1;
     VOLmin = cell2mat(Dice_data1(:,4)); VOLmin = min(VOLmin(VOLmin~=0));
-    Dsize = cell2mat(Dice_data1(:,2)).*cell2mat(Dice_data1(:,3));
+    Dsize = cell2mat(Dice_data1(:,2)).*cell2mat(Dice_data1(:,3));  %  Use size factor to repeate
     RVOL = floor(cell2mat(Dice_data1(:,4))/VOLmin);
 
     if ~Rswitch
@@ -227,7 +231,7 @@ else
 
     Rauto = zeros(size(RVOL));
     
-    for ar=0:max(RVOL)-1
+    for ar=0:max(RVOL)
         Rflag=true;
         Dice_data = Dice_data1;
         NDice_data={};
@@ -259,7 +263,7 @@ else
         Gpara.wsize = []; %handles.wsize;
         
         
-        Fstruct = DicePackingR5(Did,Ddim(:,1),Ddim(:,2),Dvol,Dreq,Gpara);
+        Fstruct = DicePackingR6(Did,Ddim(:,1),Ddim(:,2),Dvol,Dreq,Gpara);
         Tcor = Fstruct.Fcor;
         Twafer = Fstruct.Fwafer;
         
@@ -271,59 +275,58 @@ else
             GDPW1 = sum(Dstruct.map_in(:));
         end;
 
-        if sum(ceil(Twafer/GDPW1))<sum(ceil(Fwafer/GDPW))
-            
+        if sum(ceil(Twafer/GDPW1))<sum(ceil(Fwafer/GDPW))            
             Plotdata(Fstruct,Dstruct,handles.axes1,handles.axes2);
             Fcor= Fstruct.Fcor;          
             Fsets= Fstruct.Fsets;            
             Fwafer= Fstruct.Fwafer;            
+            FDdim = [Fstruct.Ddimx Fstruct.Ddimy];            
+            Fvol = Dvol;
+            Fid = Did;
             
             GDPW = sum(Dstruct.map_in(:)); 
-            Rnew = Rnew1;
-            
+            Rnew = Rnew1;            
             
         end;
 
     end;
 
 end;
-
-
 
 % Options for Stepper/Normal Reticle
 % RFL import function (Group Info + Same Cut-set Info) with decided coordinates
 
 Rshift = [max(Fcor(:,3))-min(Fcor(:,1)) max(Fcor(:,4))-min(Fcor(:,2))]/2;
-SetID = cell(length(Did),1);
+SetID = cell(length(Fid),1);
 XLset = SetID;
 XLFsets = Fsets';
-MDPW = zeros(length(Did),1);
-Lcor = zeros(length(Did),2);
+MDPW = zeros(length(Fid),1);
+Lcor = zeros(length(Fid),2);
 for l=1:length(Fsets)
     for i=1:length(Fsets{l})
         SetID{Fsets{l}(i)}=[SetID{Fsets{l}(i)} l];
         MDPW(Fsets{l}(i)) = MDPW(Fsets{l}(i))+GDPW;         % Provides # dices = GDPW x all cut-sets
-        Lcor(Fsets{l}(i),:) = [Fcor(Fsets{l}(i),1)-Rshift(1)+Ddim(Fsets{l}(i),1)/2,Fcor(Fsets{l}(i),2)-Rshift(2)+Ddim(Fsets{l}(i),2)/2];
+        Lcor(Fsets{l}(i),:) = [Fcor(Fsets{l}(i),1)-Rshift(1)+FDdim(Fsets{l}(i),1)/2,Fcor(Fsets{l}(i),2)-Rshift(2)+FDdim(Fsets{l}(i),2)/2];
         XLset{Fsets{l}(i)} = num2str(SetID{Fsets{l}(i)});
-        if Dvol(Fsets{l}(i))==0
+        if Fvol(Fsets{l}(i))==0
             XLFsets{l}(i)=0;
         end;
     end;
     XLFsets{l} = num2str(XLFsets{l}(XLFsets{l}~=0));
 end;
- XLset(Dvol==0)={'0'};
- MDPW(Dvol==0)=0;
+ XLset(Fvol==0)={'0'};
+ MDPW(Fvol==0)=0;
 % GDPW = (cell2mat(cellfun(@length,SetID,'UniformOutput', false)).*sum(map_in(:))).*(Dvol~=0);
 
 handles.xlspathout = fullfile(handles.pname,[handles.fname '_out.xlsx']);
 
 Myxlwrite(handles.xlspathout,{'Dice No' 'Dice ID' 'Dice Xcor' 'Dice Ycor' 'Set ID' 'Dice-Yield' 'Volume'},1,'A1:G1');
-Myxlwrite(handles.xlspathout,Did,1,['A2:A' num2str(length(Did)+1)]);
-Myxlwrite(handles.xlspathout,Dice_data(:,1),1,['B2:B' num2str(length(Did)+1)]);
-Myxlwrite(handles.xlspathout,Lcor,1,['C2:D' num2str(length(Did)+1)]);
-Myxlwrite(handles.xlspathout,XLset,1,['E2:E' num2str(length(Did)+1)]);
-Myxlwrite(handles.xlspathout,MDPW,1,['F2:F' num2str(length(Did)+1)]); 
-Myxlwrite(handles.xlspathout,Dvol,1,['G2:G' num2str(length(Did)+1)]);
+Myxlwrite(handles.xlspathout,Fid,1,['A2:A' num2str(length(Fid)+1)]);
+Myxlwrite(handles.xlspathout,Dice_data(:,1),1,['B2:B' num2str(length(Fid)+1)]);
+Myxlwrite(handles.xlspathout,Lcor,1,['C2:D' num2str(length(Fid)+1)]);
+Myxlwrite(handles.xlspathout,XLset,1,['E2:E' num2str(length(Fid)+1)]);
+Myxlwrite(handles.xlspathout,MDPW,1,['F2:F' num2str(length(Fid)+1)]); 
+Myxlwrite(handles.xlspathout,Fvol,1,['G2:G' num2str(length(Fid)+1)]);
 
 % Wafer Count: Calculation need to refine
 Myxlwrite(handles.xlspathout,{'Set No' 'Dice No ' 'Wafer/Set'},1,'I1:K1');
@@ -332,12 +335,13 @@ Myxlwrite(handles.xlspathout,XLFsets,1,['J2:J' num2str(length(Fsets)+1)]);
 Myxlwrite(handles.xlspathout,ceil(Fwafer/GDPW),1,['K2:K' num2str(length(Fsets)+1)]);
 Myxlwrite(handles.xlspathout,{'Total Wafer =',sum(ceil(Fwafer/GDPW))},1,['J' num2str(length(Fsets)+2) ':K' num2str(length(Fsets)+2)]);
 
+Myxlwrite(handles.xlspathout,FDdim,1,['M2:N' num2str(length(Fid)+1)]);
 
 % Myxlwrite(handles.xlspath,ceil(Dvol./GDPW),2,['H2:H' num2str(length(Did)+1)]);
 % Myxlwrite(handles.xlspath,{'Total Wafer =', num2str(sum(ceil(Dvol(GDPW~=0)./GDPW(GDPW~=0))-1)+length(Fsets))},2,'J2:K2');
 
 set(handles.edit_bsize,'String',num2str(Rnew));
-set(handles.edit_bshift,'String',num2str([xoffset,yoffset]));
+set(handles.edit_bshift,'String',num2str([Dstruct.xoffset,Dstruct.yoffset]));
 set(handles.edit_shotno,'String',num2str(GDPW));
 
 guidata(hObject,handles);
