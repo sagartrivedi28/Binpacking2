@@ -17,11 +17,19 @@ Sline = Gpara.Sline;
 Rno = Gpara.Rno;
 wsize = Gpara.wsize;
 
+if Gpara.TBflag
+    CRblock = [Gpara.TBcorner(1)*Gpara.TBcorner(3), Gpara.TBcorner(2)*Gpara.TBcorner(4)];
+    CNblock = Gpara.TBcenter;
+end;
+
+
+
+
 BladeSplit = Dreq(:,1);
 Caround = Dreq(:,2);
 SameCut = Dreq(:,3);
 Iso1mm = Dreq(:,4);
-
+DiceGroup = Dreq(:,6);
 
 Ddimx = Ddimx+IValue*(Iso1mm~=0);
 Ddimy = Ddimy+IValue*(Iso1mm~=0);
@@ -34,6 +42,7 @@ NDreq = Dreq(ind1,:);
 N = length(NDid);
 Wcnt = Inf;
 NBladeSplit = BladeSplit(ind1);
+NDiceGroup = DiceGroup(ind1);
 % NIso1mm = Iso1mm(ind1);
 % NCaround = Caround(ind1);
 NSameCut = SameCut(ind1);
@@ -72,8 +81,12 @@ if max(NBladeSplit)==2
     SplitFlag=true;
 end;
 
+% if max(NDiceGroup)>0
+%     
+% end;
+
 % if max(NSameCut)>0
-%     CutInfo = 
+%    
 %     
 % end;
 
