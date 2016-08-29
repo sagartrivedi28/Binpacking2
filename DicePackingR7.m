@@ -16,13 +16,12 @@ Rmax = Gpara.Rmax;
 Sline = Gpara.Sline;
 Rno = Gpara.Rno;
 wsize = Gpara.wsize;
+TBflag = Gpara.TBflag;
 
-if Gpara.TBflag
-    CRblock = [Gpara.TBcorner(1)*Gpara.TBcorner(3), Gpara.TBcorner(2)*Gpara.TBcorner(4)];
-    CNblock = Gpara.TBcenter;
+if TBflag
+    CRblock = [Gpara.TBcorner(1)*Gpara.TBcorner(3), Gpara.TBcorner(2)*Gpara.TBcorner(4)];   % width, height, column, row
+    CNblock = [Gpara.TBcenter(1)*Gpara.TBcenter(3), Gpara.TBcenter(2)*Gpara.TBcenter(4)];       % width, height, column, row
 end;
-
-
 
 
 BladeSplit = Dreq(:,1);
@@ -56,16 +55,18 @@ for i=1:max(vol_grp)                                 %same volume sort by ydim
 ind_vol(vol_grp==i)=sort(ind_mvol(vol_grp==i),'descend');
 end
 
-for W = Rmax(1):-1000:12000 %max(NDdimx)
+for oldW = Rmax(1):-1000:12000 %max(NDdimx)
 
-i=1;
+i=1; 
 T_height=0;
 shelf.height = [];
-shelf.empty = W;
+shelf.empty = oldW;
 shelf.Dinfo = [];
 shelf.level=[];
 shelf.nRow=1;       % for multiple row optimization/ Total # rows
 shelf.Rid = [];         % Each dice row ID
+W = oldW;
+
 
 height_nRow=0;
 Dcor = zeros(N,4);
@@ -92,7 +93,39 @@ end;
 
 
 while any(DPool)   
+%%%%%%%%%%%%%%%%%% TB Placement %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+if (i<=4 && TBflag &&  shelf(i).empty==W) % Row 1,2 for corner & 3 for center TB placement 
+    if ShiftUpFlag
+        ShiftUp=300-Sline(2);
+    else
+        ShiftUp=0; 
+    end
+    shelf(i).level = T_height + ShiftUp;
+    shelf(i).nRow = 1;         
+    height_empty=0;
+    ShiftUpFlag=false;
+    if i<=2            
+        T_height = T_height + CRblock(2) + ShiftUp;       
+        shelf(i).height = CRblock(2);                            
+        height_nRow=shelf(i).height;  
+        W = oldW-CRblock(1);
+        shelf(i).empty = W - 2*CRblock(1);         
+    elseif i==3        
+        T_height = T_height + CNblock(2) + ShiftUp;         
+        shelf(i).height = CNblock(2);                            
+        height_nRow=shelf(i).height;        
+        W = (oldW-CNblock(1))/2;
+        shelf(i).empty = W;
+                       
+    else
+        i=i-1;        
+        W = oldW;
+        shelf(i).empty = (oldW-CNblock(1))/2 + min(shelf(i).empty);
+        TBflag = false;
+    end;
 
+end; 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  n=find(DPool,1,'first');
  if ~any(shelf(i).empty(1) >= NDdimx(n))
        n=find(shelf(i).empty(1) >= NDdimx & DPool & NDdimy>=height_nRow(1)/th_NDdimy,1,'first');      %  Finding Dices which are high enough & within empty Space.
@@ -100,21 +133,21 @@ while any(DPool)
  n_multi=[];
 
  if ~isempty(n)                                                                        % IF available valid candidate for placement
-     if shelf(i).empty==W                                                              % Single Rows Initialization
+     if shelf(i).empty==W && ~TBflag                                                   % Single Rows Initialization    
          
          if ShiftUpFlag
              ShiftUp=300-Sline(2);
          else
              ShiftUp=0; 
-         end
-         
+         end         
          shelf(i).height = NDdimy(n);
          shelf(i).level = T_height + ShiftUp;
          shelf(i).nRow = 1;
          height_nRow=shelf(i).height;
          height_empty=0;
          T_height = T_height+NDdimy(n) + ShiftUp;
-         ShiftUpFlag=false;
+         ShiftUpFlag=false;                     
+         
      else
          nRow=shelf(i).height/NDdimy(n);
          if length(shelf(i).empty)==1 && nRow>=th_nRow        % Multiple Rows Initialization
