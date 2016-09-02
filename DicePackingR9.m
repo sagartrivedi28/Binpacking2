@@ -1,4 +1,4 @@
-function Fstruct = DicePackingR9( Did,Ddimx,Ddimy,Dvol,Dreq,Gpara)
+function Fstruct = DicePackingR7( Did,Ddimx,Ddimy,Dvol,Dreq,Gpara)
 
 IValue = 2000; % in Micrometer
 Fstruct.Fcor=0;
@@ -18,7 +18,7 @@ if TBflagM
     CRblock = [Gpara.TBcorner(1)*Gpara.TBcorner(3), Gpara.TBcorner(2)*Gpara.TBcorner(4)];   % width, height, column, row
     CNblock = [Gpara.TBcenter(1)*Gpara.TBcenter(3), Gpara.TBcenter(2)*Gpara.TBcenter(4)];    % width, height, column, row
     
-    MinR = max([2*CRblock+2*median(Ddimx),CNblock+2*median(Ddimx)]); 
+    MinR = max([2*CRblock+2*median(Ddimx),CNblock+2*median(Ddimx), 12000]); 
 else
     MinR = 12000;
 end;
@@ -62,7 +62,7 @@ end
 
 
 
-for oldW = Rmax(1)%:-1000: MinR
+for oldW = Rmax(1):-1000: MinR
 
 i=1; 
 T_height=0;
@@ -106,6 +106,7 @@ while any(DPool)
 if (i<=4 && TBflag &&  shelf(i).empty(1)==W) % Row 1,2 for corner & 3 for center TB placement 
     if ShiftUpFlag
         ShiftUp=300-Sline(2);
+        shelf(i-1).height(1) = shelf(i-1).height(1)+ShiftUp;
     else
         ShiftUp=0; 
     end
@@ -167,6 +168,7 @@ n=find(DPoolT,1,'first');
          TBflag1 = false;
          if ShiftUpFlag
              ShiftUp=300-Sline(2);
+             shelf(i-1).height(1) = shelf(i-1).height(1)+ShiftUp;
          else
              ShiftUp=0; 
          end         
@@ -198,44 +200,46 @@ n=find(DPoolT,1,'first');
  end
 
  for nr=2:shelf(i).nRow % Multi-Row
-      if newnRow
-         height_empty(nr)=shelf(i).height-sum(height_nRow);
-      else
-         height_empty(nr)=height_nRow(nr)+(shelf(i).height-sum(height_nRow))*(nr==shelf(i).nRow);
-      end
-      x_empty=shelf(i).empty(nr)>=NDdimx(ind_vol);
-      y_empty=height_empty(nr)>=NDdimy(ind_vol);
-      n_multi = ind_vol(find(x_empty & y_empty & DPool(ind_vol),1,'first'));
-      if ~isempty(n_multi)
-           if newnRow
-               height_nRow(nr)=NDdimy(n_multi);
-           end;
-          DPool(n_multi) = false;
-          [shelf,Dcor,Dloc(nr)] = BulidShelf(shelf,Dcor,W,NDid,NDdimx,NDdimy,i,n_multi,height_nRow,nr);
-          shelf(i).Rid = [shelf(i).Rid; nr];
-      end
+    
+          if newnRow
+             height_empty(nr)=shelf(i).height-sum(height_nRow);
+          else
+             height_empty(nr)=height_nRow(nr)+(shelf(i).height-sum(height_nRow))*(nr==shelf(i).nRow);
+          end
+          x_empty=shelf(i).empty(nr)>=NDdimx(ind_vol);
+          y_empty=height_empty(nr)>=NDdimy(ind_vol);
+          n_multi = ind_vol(find(x_empty & y_empty & DPool(ind_vol),1,'first'));
+          if ~isempty(n_multi)
+               if newnRow
+                   height_nRow(nr)=NDdimy(n_multi);
+               end;
+              DPool(n_multi) = false;
+              [shelf,Dcor,Dloc(nr)] = BulidShelf(shelf,Dcor,W,NDid,NDdimx,NDdimy,i,n_multi,height_nRow,nr);
+              shelf(i).Rid = [shelf(i).Rid; nr];
+          end
+    
  end
       shelf(i).nRow=length(height_nRow);
       newnRow=false;
             
 
-      if isempty(n) && isempty(n_multi)
+      if isempty(n) && isempty(n_multi) && any(DPool)
           
           if ~TBflag1 && ~TBflag  % Fix the issue
               [Dcor,shelf]=xEqualSpace(Dcor,shelf,W,i);
           end;         
          
-        if ~isempty(shelf(i).Dinfo)
-            H_i=unique(roundoff(sort(Dcor(shelf(i).Dinfo(:,1),4),'descend')),'stable');        
-            H_diff_i=H_i(1)-H_i(min(2,length(H_i)));
-            ShiftUpFlag= 0 < H_diff_i && H_diff_i < 300-Sline(2);
-         else
-             ShiftUpFlag = 0;
-         end;
+            if ~isempty(shelf(i).Dinfo)
+                H_i=unique(roundoff(sort(Dcor(shelf(i).Dinfo(:,1),4),'descend')),'stable');        
+                H_diff_i=H_i(1)-H_i(min(2,length(H_i)));
+                ShiftUpFlag= 0 < H_diff_i && H_diff_i < 300-Sline(2);
+             else
+                 ShiftUpFlag = 0;
+            end;
          
-         i=i+1;
-         shelf(i).empty=W;
-         height_nRow=0;
+             i=i+1;
+             shelf(i).empty=W;
+             height_nRow=0;
       end
       
  %%%%%%%%%%%% Split Blade %%%%%%%%%%%%%
@@ -259,10 +263,18 @@ end;
 
 Dcor = EdgeAlignment(Dcor,shelf,W,Dvol,Sline); 
 
-% if ShiftFlag
-%      [shelf,Dcor] = SwapShelf(shelf,Dcor,2, length(shelf));
-%      [shelf,Dcor] = SwapShelf(shelf,Dcor,3,round(length(shelf)/2));
-% end;
+if ShiftFlag
+    
+    for roll=2:length(shelf)
+        [shelf,Dcor] = SwapShelf(shelf,Dcor,roll, min([roll+1,length(shelf)]));        
+    end;
+    
+    ShelfC = max([2,round(length(shelf)/2)]);
+    for roll=2:ShelfC
+        [shelf,Dcor] = SwapShelf(shelf,Dcor,roll,min([roll+1,ShelfC]));
+    end;     
+     
+end;
 
 %Dcor = ChipAround(Dcor,shelf,Caround);
 
@@ -272,7 +284,7 @@ Dstruct = DieOffset(Rnew(1),Rnew(2),wsize);
 GDPW = sum(Dstruct.map_in(:));
 else
 GDPW = min(NDvol(NDvol~=0));
-end    
+end
 
 if T_height< Rmax(2)
 Cmat = Cgraph(Dcor,Dvol,N,Sline);
